@@ -5,6 +5,8 @@ Resources:
     Type: AWS::EC2::VPC
     Properties:
       CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
 
   PublicSubnetA:
     Type: AWS::EC2::Subnet
@@ -37,14 +39,21 @@ Resources:
   AppLaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
-      ImageId: ami-0389b2a3c4948b1a0
+      ImageId: ami-0fc61db8544a617ed
       InstanceType: t2.micro
       SecurityGroups:
         - !Ref InstanceSecurityGroup
+      AssociatePublicIpAddress: true
+      IamInstanceProfile: day7ssm
+      KeyName: ansarivirginiakey
       UserData:
         Fn::Base64:
           Fn::Sub: |
             #!/bin/bash -xe
+            (echo redhat; echo redhat) | sudo passwd ec2-user
+            echo 'ec2-user   ALL=(ALL)       NOPASSWD: ALL' | sudo EDITOR='tee -a' visudo
+            sudo sed -i "/^[^#]*PasswordAuthentication[[:space:]]no/c\PasswordAuthentication yes" /etc/ssh/sshd_config
+            systemctl restart sshd
             yum update -y
             yum install -y httpd
             systemctl start httpd
@@ -61,6 +70,10 @@ Resources:
           IpProtocol: tcp
           ToPort: 80
           SourceSecurityGroupId: !Ref ApplicationLoadBalancerSecurityGroup
+        - FromPort: 22 # (4)
+          ToPort: 22
+          CidrIp: 0.0.0.0/0 # (5)
+          IpProtocol: tcp
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
